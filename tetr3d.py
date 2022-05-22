@@ -3,7 +3,7 @@ import gmsh
 import vtk
 import math
 import os
-
+import sys
 
 # Класс расчётной сетки
 class CalcMesh:
@@ -12,16 +12,14 @@ class CalcMesh:
     def __init__(self, nodes_coords, tetrs_points):
         # 3D-сетка из расчётных точек
         # Пройдём по узлам в модели gmsh и заберём из них координаты
-        self.nodes = np.array([nodes_coords[0::3],nodes_coords[1::3],nodes_coords[2::3]])
+        self.nodes = np.array([nodes_coords[0::3], nodes_coords[1::3], nodes_coords[2::3]])
 
-        # Модельная скалярная величина распределена как-то вот так
-        self.smth = np.power(self.nodes[0, :], 2) + np.power(self.nodes[1, :], 2)
+        self.smth = 10 * np.cos(self.nodes[0, :]) + 5 * np.sin(self.nodes[1, :])
 
-        # Тут может быть скорость, но сейчас здесь нули
         self.velocity = np.zeros(shape=(3, int(len(nodes_coords) / 3)), dtype=np.double)
+        self.velocity[2, :] = np.cos(self.nodes[0, :])
 
-        # Пройдём по элементам в модели gmsh
-        self.tetrs = np.array([tetrs_points[0::4],tetrs_points[1::4],tetrs_points[2::4],tetrs_points[3::4]])
+        self.tetrs = np.array([tetrs_points[0::4], tetrs_points[1::4], tetrs_points[2::4], tetrs_points[3::4]])
         self.tetrs -= 1
 
     # Метод отвечает за выполнение для всей сетки шага по времени величиной tau
@@ -85,14 +83,14 @@ gmsh.initialize()
 # Считаем STL
 try:
     path = os.path.dirname(os.path.abspath(__file__))
-    gmsh.merge(os.path.join(path, 't13_data.stl'))
+    gmsh.merge(os.path.join(path, 'Sphere.stl'))
 except:
     print("Could not load STL mesh: bye!")
     gmsh.finalize()
     exit(-1)
 
 # Восстановим геометрию
-angle = 40
+angle = 2
 forceParametrizablePatches = False
 includeBoundary = True
 curveAngle = 180
@@ -140,12 +138,11 @@ for i in range(0, len(nodeTags)):
 # И ещё проверим, что в тетраэдрах что-то похожее на правду лежит.
 assert(len(tetrsNodesTags) % 4 == 0)
 
-# TODO: неплохо бы полноценно данные сетки проверять, да
+tau = 0.01
 
 mesh = CalcMesh(nodesCoord, tetrsNodesTags)
-mesh.snapshot(0)
-
-if '-nopopup' not in sys.argv:
-    gmsh.fltk.run()
+for i in range(1, 100):
+    mesh.move(tau)
+    mesh.snapshot(i)
 
 gmsh.finalize()
